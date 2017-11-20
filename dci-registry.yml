@@ -1,0 +1,77 @@
+---
+- name: setup DCI registry
+  hosts: all
+  become: yes
+  become_user: root
+  tasks:
+    - name: install extra packages
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - epel-release
+        - git
+        - vim
+        - python-setuptools
+        - python-devel
+        - libffi-devel
+        - openssl-devel
+        - redhat-rpm-config
+        - gcc
+        - firewalld
+
+    - name: install DCI packages
+      package:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - https://packages.distributed-ci.io/dci-release.el7.noarch.rpm
+        - https://packages.distributed-ci.io/dci-sshpubkeys.el7.noarch.rpm
+
+    - name: set domain_name
+      set_fact:
+        domain_name: "{{ domain_name | default(inventory_hostname) }}"
+
+    - name: set letsencrypt_email
+      set_fact:
+        letsencrypt_email: "{{ letsencrypt_email | default('distributed-ci@redhat.com') }}"
+
+    - name: allow http through firewalld
+      firewalld:
+        service: http
+        permanent: true
+        state: enabled
+
+    - name: allow https through firewalld
+      firewalld:
+        service: https
+        permanent: true
+        state: enabled
+
+    - name: reload firewalld
+      service:
+        name: firewalld
+        state: reloaded
+
+    - name: stat letencrypt file
+      stat:
+        path: /etc/letsencrypt/live/{{ domain_name }}/privkey.pem
+      register: letsencrypt_file
+
+    - name: install certbot
+      yum: name=certbot state=present
+      when: letsencrypt_file.stat.exists == False
+
+    - name: generate cert
+      command: "certbot certonly --standalone --noninteractive --quiet --email {{ letsencrypt_email }} --agree-tos -d {{ domain_name }}"
+      when: letsencrypt_file.stat.exists == False
+
+    - name: link domain
+      shell: |
+        pushd /etc/letsencrypt/live/{{ domain_name }}
+        ln -s privkey.pem {{ domain_name }}-privkey.pem
+        ln -s cert.pem {{ domain_name }}-cert.pem
+        ln -s chain.pem {{ domain_name }}-chain.pem
+        ln -s fullchain.pem {{ domain_name }}-fullchain.pem
+        popd
+      when: letsencrypt_file.stat.exists == False

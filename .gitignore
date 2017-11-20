@@ -1,0 +1,3 @@
+*.retry
+rdo-container-registry/
+venv/

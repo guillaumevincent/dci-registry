@@ -1,0 +1,11 @@
+[dci]
+registry.distributed-ci.io
+
+[masters]
+registry.distributed-ci.io
+
+[etcd]
+registry.distributed-ci.io
+
+[nodes]
+registry.distributed-ci.io openshift_node_labels="{'region': 'infra', 'zone': 'default'}" openshift_schedulable=true
